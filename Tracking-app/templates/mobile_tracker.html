@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Mobile GPS Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body{font-family:'Poppins',sans-serif;background-color:#1a202c;color:#e2e8f0;display:flex;justify-content:center;align-items:center;text-align:center;height:100vh;margin:0}.container{background-color:#2d3748;padding:30px;border-radius:12px;box-shadow:0 5px 20px rgba(0,0,0,0.3);width:90%;max-width:400px}h1{margin-top:0}input{width:calc(100% - 20px);padding:10px;margin-bottom:20px;border-radius:6px;border:none;font-size:1rem}button{width:100%;padding:12px;border:none;border-radius:6px;font-size:1rem;font-weight:600;cursor:pointer;transition:background-color .2s ease}#startBtn{background-color:#48bb78;color:#1a202c}#stopBtn{background-color:#f56565;color:#1a202c;margin-top:10px}#status{margin-top:20px;font-size:.9rem;min-height:40px;color:#a0aec0}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bus Tracker Mode 🛰️</h1>
+        <input type="text" id="deviceId" placeholder="Enter Bus ID (e.g., Bus-01)">
+        <button id="startBtn">Start Tracking</button>
+        <button id="stopBtn" disabled>Stop Tracking</button>
+        <div id="status">Enter a Bus ID and press Start.</div>
+    </div>
+
+    <script>
+        const deviceIdInput = document.getElementById('deviceId');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const statusDiv = document.getElementById('status');
+        const serverUrl = '/update_location';
+        let watchId = null;
+
+        startBtn.addEventListener('click', () => {
+            const deviceId = deviceIdInput.value.trim();
+            if (!deviceId) { alert('Please enter a Bus ID.'); return; }
+            if (!navigator.geolocation) { statusDiv.textContent = 'Geolocation is not supported.'; return; }
+            statusDiv.textContent = 'Starting... Please allow location access.';
+            
+            watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    statusDiv.innerHTML = `Tracking...<br>Lat: ${latitude.toFixed(5)}, Lng: ${longitude.toFixed(5)}`;
+                    sendLocationToServer(deviceId, latitude, longitude);
+                },
+                (error) => { statusDiv.textContent = `Error: ${error.message}`; },
+                { enableHighAccuracy: true }
+            );
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            deviceIdInput.disabled = true;
+        });
+
+        stopBtn.addEventListener('click', () => {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+                statusDiv.textContent = 'Tracking stopped.';
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                deviceIdInput.disabled = false;
+            }
+        });
+
+        async function sendLocationToServer(deviceId, lat, lng) {
+            try {
+                await fetch(serverUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ device_id: deviceId, lat, lng })
+                });
+            } catch (error) {
+                console.error('Failed to send location:', error);
+                statusDiv.textContent = 'Error: Could not send location.';
+            }
+        }
+    </script>
+</body>
+</html>
