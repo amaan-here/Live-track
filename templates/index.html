@@ -5,38 +5,34 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://unpkg.com/@googlemaps/polyline-codec@1.0.28/dist/polyline-codec.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
     
     <style>
         :root{--surface-color:#ffffff; --text-color:#1a202c; --accent-color:#3182ce; --shadow-color: rgba(0,0,0,0.1);}
         html, body { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Poppins', sans-serif; background-color: #f0f2f5; }
         #map-container { position: absolute; top: 20px; right: 20px; bottom: 20px; left: 20px; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px var(--shadow-color); }
-        #map { width: 100%; height: 100%; }
-        #search-container { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; z-index: 1000; }
-        #search-input { width: 100%; padding: 15px 20px; font-size: 1.1rem; border-radius: 12px; border: 1px solid #ddd; box-shadow: 0 5px 15px var(--shadow-color); background-color: var(--surface-color); color: var(--text-color); }
-        #suggestions-list { list-style: none; padding: 0; margin: 10px 0 0 0; background-color: var(--surface-color); border-radius: 12px; max-height: 250px; overflow-y: auto; box-shadow: 0 5px 15px var(--shadow-color); }
-        #suggestions-list li { padding: 12px 20px; color: var(--text-color); cursor: pointer; border-bottom: 1px solid #eee; }
-        #suggestions-list li:hover { background-color: #f0f2f5; }
-        #suggestions-list li:last-child { border-bottom: none; }
-        #stops-dropdown-container { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; z-index: 999; }
+        #map { width: 100%; height: 100%; background-color: #e0e0e0; }
+        #search-container { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; z-index: 10; }
+        .search-box { display: flex; box-shadow: 0 5px 15px var(--shadow-color); }
+        #search-input { flex-grow: 1; padding: 15px 20px; font-size: 1.1rem; border: 1px solid #ddd; background-color: var(--surface-color); color: var(--text-color); border-radius: 12px 0 0 12px; }
+        #search-btn { padding: 0 20px; font-size: 1.2rem; border: 1px solid #ddd; border-left: none; background-color: var(--accent-color); color: white; cursor: pointer; border-radius: 0 12px 12px 0; }
+        #stops-dropdown-container { position: absolute; top: 110px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; z-index: 9; }
         #stops-dropdown { width: 100%; padding: 15px; font-size: 1rem; border-radius: 12px; border: 1px solid #ddd; background-color: var(--surface-color); color: var(--text-color); box-shadow: 0 5px 15px var(--shadow-color); }
-        #relocate-btn { position: absolute; bottom: 30px; right: 20px; z-index: 1000; background-color: var(--surface-color); color: var(--text-color); border: 1px solid #ddd; border-radius: 50%; width: 40px; height: 40px; font-size: 1.5rem; cursor: pointer; box-shadow: 0 2px 8px var(--shadow-color); display: flex; align-items: center; justify-content: center; }
-        .bus-icon { background: transparent; border: none; font-size: 24px; text-align: center; line-height: 24px; }
     </style>
 </head>
 <body>
 
     <div id="map-container">
         <div id="map"></div>
-        <button id="relocate-btn" title="Recenter on my location">📍</button>
     </div>
 
     <div id="search-container">
-        <input type="text" id="search-input" placeholder="Search Destination or Live Bus...">
-        <ul id="suggestions-list"></ul>
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="Search Destination...">
+            <button id="search-btn">🔍</button>
+        </div>
     </div>
 
     <div id="stops-dropdown-container" style="display: none;">
@@ -46,27 +42,27 @@
     </div>
 
     <script>
-        // --- DATA AND GLOBAL VARIABLES ---
-        const locationsDB = [
-            { name: "City Palace", type: "destination", lat: 24.5763, lng: 73.6841 }, { name: "Lake Pichola", type: "destination", lat: 24.5725, lng: 73.6785 }, { name: "Saheliyon Ki Bari", type: "destination", lat: 24.6096, lng: 73.6882 }, { name: "Fateh Sagar Lake", type: "destination", lat: 24.6022, lng: 73.6763 }, { name: "Ghantaghar Stop", type: "bus_stop", lat: 24.5799, lng: 73.6845 }, { name: "Doodh Talai Stop", type: "bus_stop", lat: 24.5685, lng: 73.6821 }, { name: "Chetak Circle", type: "bus_stop", lat: 24.5880, lng: 73.6930 }, { name: "Railway Station", type: "bus_stop", lat: 24.5721, lng: 73.7032 }, { name: "Fatehpura Stop", type: "bus_stop", lat: 24.5983, lng: 73.6826 }
-        ];
+        let map;
         const liveBusMarkers = {};
         let userMarker = null, destinationMarker = null, routePolyline = null;
-        
+        let infoWindow;
+
         // UI Elements
-        const map = L.map('map').setView([24.5854, 73.7125], 14);
         const searchInput = document.getElementById('search-input');
-        const suggestionsList = document.getElementById('suggestions-list');
+        const searchBtn = document.getElementById('search-btn');
         const stopsDropdownContainer = document.getElementById('stops-dropdown-container');
         const stopsDropdown = document.getElementById('stops-dropdown');
-        const relocateBtn = document.getElementById('relocate-btn');
 
-        // --- CORE FUNCTIONS ---
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: 24.5854, lng: 73.7125 },
+                zoom: 14,
+                mapTypeControl: false,
+                streetViewControl: false
+            });
 
-        function initApp() {
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(map);
+            infoWindow = new google.maps.InfoWindow();
+            
             startUserTracking();
             setupEventListeners();
             connectToSocketServer();
@@ -76,166 +72,133 @@
             const socket = io();
             socket.on('connect', () => console.log('Connected to real-time server!'));
             socket.on('new_location', (data) => {
-                console.log("Received live data:", data);
-                updateLiveBusMarker(data.device_id, [data.location.lat, data.location.lng]);
+                updateLiveBusMarker(data.device_id, { lat: data.location.lat, lng: data.location.lng });
             });
         }
 
         function updateLiveBusMarker(deviceId, latLng) {
             const deviceIdKey = deviceId.toLowerCase();
             if (liveBusMarkers[deviceIdKey]) {
-                liveBusMarkers[deviceIdKey].setLatLng(latLng);
+                liveBusMarkers[deviceIdKey].setPosition(latLng);
             } else {
-                const busIcon = L.divIcon({ className: 'bus-icon', html: '🚌', iconSize: [24, 24] });
-                liveBusMarkers[deviceIdKey] = L.marker(latLng, { icon: busIcon }).addTo(map)
-                                            .bindPopup(`<b>Live Bus:</b> ${deviceId}`);
+                liveBusMarkers[deviceIdKey] = new google.maps.Marker({
+                    position: latLng,
+                    map: map,
+                    title: `Live Bus: ${deviceId}`,
+                    icon: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#1a202c"><path d="M0 0h24v24H0z" fill="none"/><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2V9c0-.55-.45-1-1-1zm-6 10H6c-.55 0-1-.45-1-1V6h11v12zM7 15c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm10 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>')
+                });
             }
         }
 
         function startUserTracking() {
             if (!navigator.geolocation) return alert("Geolocation is not supported.");
             navigator.geolocation.watchPosition(position => {
-                const latLng = [position.coords.latitude, position.coords.longitude];
+                const latLng = { lat: position.coords.latitude, lng: position.coords.longitude };
                 if (!userMarker) {
-                    userMarker = L.circleMarker(latLng, { radius: 8, color: '#3182ce', fillColor: '#3182ce', fillOpacity: 1 }).addTo(map).bindPopup("<b>Your Location</b>").openPopup();
+                    userMarker = new google.maps.Marker({
+                        position: latLng,
+                        map: map,
+                        title: "Your Location",
+                        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: '#3182ce', fillOpacity: 1, strokeWeight: 2, strokeColor: '#ffffff' }
+                    });
                     map.panTo(latLng);
                 } else {
-                    userMarker.setLatLng(latLng);
-                }
-                if (routePolyline) {
-                    const stopLatLng = routePolyline.getLatLngs()[routePolyline.getLatLngs().length - 1]; // Get the end of the route
-                    drawRoute(userMarker.getLatLng(), stopLatLng, destinationMarker.getPopup().getContent());
+                    userMarker.setPosition(latLng);
                 }
             });
         }
 
-        function showSuggestions(query) {
-            suggestionsList.innerHTML = '';
-            const lowerCaseQuery = query.toLowerCase();
-            if (!lowerCaseQuery) return;
-            const liveBuses = Object.keys(liveBusMarkers).filter(busId => busId.includes(lowerCaseQuery));
-            const filteredLocations = locationsDB.filter(loc => loc.name.toLowerCase().includes(lowerCaseQuery));
-            [...filteredLocations, ...liveBuses].forEach(item => {
-                const li = document.createElement('li');
-                if (typeof item === 'string') {
-                    li.textContent = `Live Bus: ${item}`;
-                    li.onclick = () => handleSuggestionClick({ name: item, type: 'live_bus' });
-                } else {
-                    li.textContent = item.name;
-                    li.onclick = () => handleSuggestionClick(item);
-                }
-                suggestionsList.appendChild(li);
-            });
-        }
-
-        function handleSuggestionClick(location) {
-            const searchKey = location.name.toLowerCase();
-            searchInput.value = location.name;
-            suggestionsList.innerHTML = '';
-            if (destinationMarker) map.removeLayer(destinationMarker);
-            if (location.type === 'live_bus') {
-                const busMarker = liveBusMarkers[searchKey];
-                if (busMarker) {
-                    map.flyTo(busMarker.getLatLng(), 16);
-                    busMarker.openPopup();
-                    stopsDropdownContainer.style.display = 'none';
-                }
-            } else {
-                destinationMarker = L.marker([location.lat, location.lng]).addTo(map).bindPopup(`<b>${location.name}</b>`).openPopup();
-                map.flyTo([location.lat, location.lng], 15);
-                findNearbyStops();
+        async function handleSearch() {
+            const query = searchInput.value.trim();
+            if (!query || !userMarker) {
+                return alert("Please enter a destination and enable your location.");
             }
-        }
+            const userLatLng = userMarker.getPosition().toJSON();
 
-        function findNearbyStops() {
-            if (!userMarker) return alert("Your location is needed to find nearby stops.");
-            const userLatLng = userMarker.getLatLng();
-            const busStops = locationsDB.filter(loc => loc.type === 'bus_stop').map(stop => {
-                    stop.distance = userLatLng.distanceTo(L.latLng(stop.lat, stop.lng));
-                    return stop;
-                }).sort((a, b) => a.distance - b.distance).slice(0, 3);
-            populateStopsDropdown(busStops);
+            try {
+                const response = await fetch(`/search_destination?query=${encodeURIComponent(query)}&lat=${userLatLng.lat}&lng=${userLatLng.lng}`);
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error);
+                
+                if (destinationMarker) destinationMarker.setMap(null);
+                
+                const destLoc = data.destination.location;
+                destinationMarker = new google.maps.Marker({ position: destLoc, map: map, title: data.destination.name });
+                map.panTo(destLoc);
+                populateStopsDropdown(data.nearby_stops);
+
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
         }
 
         function populateStopsDropdown(stops) {
             stopsDropdown.innerHTML = '<option selected disabled>Select a nearby bus stop...</option>';
+            if (stops.length === 0) {
+                stopsDropdown.innerHTML = '<option disabled>No nearby stops found.</option>';
+            }
             stops.forEach(stop => {
                 const option = document.createElement('option');
-                option.value = JSON.stringify(stop);
-                option.textContent = `${stop.name} (~${Math.round(stop.distance)}m away)`;
+                option.value = JSON.stringify(stop.location);
+                option.textContent = stop.name;
                 stopsDropdown.appendChild(option);
             });
             stopsDropdownContainer.style.display = 'block';
         }
 
-        async function drawRoute(startLatLng, endLatLng, stopPopupContent) {
-            if (routePolyline) map.removeLayer(routePolyline);
-
-            const start = `${startLatLng.lng},${startLatLng.lat}`;
-            const end = `${endLatLng.lng},${endLatLng.lat}`;
+        async function drawRoute(startLatLng, endLatLng, stopName) {
+            if (routePolyline) routePolyline.setMap(null);
+            
+            const start = `${startLatLng.lat},${startLatLng.lng}`;
+            const end = `${endLatLng.lat},${endLatLng.lng}`;
             
             try {
                 const response = await fetch(`/get_route?start=${start}&end=${end}`);
                 const data = await response.json();
+                if (!response.ok) throw new Error(data.error);
 
-                if (!response.ok || !data.features) {
-                    throw new Error(data.error || "Failed to get route from ORS");
-                }
-
-                const routeCoordinates = data.features[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
-                routePolyline = L.polyline(routeCoordinates, { color: '#3182ce', weight: 5 }).addTo(map);
+                const routePath = google.maps.geometry.encoding.decodePath(data.polyline);
+                routePolyline = new google.maps.Polyline({
+                    path: routePath,
+                    geodesic: true,
+                    strokeColor: '#3182ce',
+                    strokeOpacity: 0.8,
+                    strokeWeight: 5
+                });
+                routePolyline.setMap(map);
                 
-                const durationInMinutes = Math.round(data.features[0].summary.duration / 60);
-                const etaMessage = `~ ${durationInMinutes} min walk`;
+                const bounds = new google.maps.LatLngBounds();
+                routePath.forEach(point => bounds.extend(point));
+                map.fitBounds(bounds);
 
-                if (destinationMarker) {
-                     destinationMarker.bindPopup(`${stopPopupContent}<hr><b>${etaMessage}</b>`).openPopup();
-                }
+                infoWindow.setContent(`<b>${stopName}</b><br>~ ${data.duration} walk`);
+                infoWindow.open(map, destinationMarker);
                 
-                map.fitBounds(routePolyline.getBounds(), { padding: [50, 50] });
-
             } catch (error) {
                 console.error("Routing Error:", error);
-                // Fallback to a straight line if the API fails
-                routePolyline = L.polyline([startLatLng, endLatLng], { color: '#e53e3e', weight: 4 }).addTo(map);
-                map.fitBounds([startLatLng, endLatLng], { padding: [50, 50] });
             }
         }
 
         function setupEventListeners() {
-            searchInput.addEventListener('input', () => showSuggestions(searchInput.value));
+            searchBtn.addEventListener('click', handleSearch);
             searchInput.addEventListener('keyup', (event) => {
-                if (event.key === 'Enter') {
-                    const firstSuggestion = suggestionsList.firstChild;
-                    if (firstSuggestion) {
-                        firstSuggestion.click();
-                    }
-                }
+                if (event.key === 'Enter') handleSearch();
             });
+
             stopsDropdown.addEventListener('change', () => {
                 if (!userMarker) return alert("Your location is not available yet.");
-                const selectedStop = JSON.parse(stopsDropdown.value);
-                const stopLatLng = L.latLng(selectedStop.lat, selectedStop.lng);
-                if (destinationMarker) map.removeLayer(destinationMarker);
-                destinationMarker = L.marker(stopLatLng).addTo(map);
-                drawRoute(userMarker.getLatLng(), stopLatLng, `<b>${selectedStop.name}</b>`);
-                stopsDropdownContainer.style.display = 'none';
-            });
-            document.addEventListener('click', (e) => {
-                if (!searchInput.contains(e.target)) {
-                    suggestionsList.innerHTML = '';
-                }
-            });
-            relocateBtn.addEventListener('click', () => {
-                if (userMarker) {
-                    map.flyTo(userMarker.getLatLng(), 16);
-                } else {
-                    alert("Your location is not being tracked yet. Please enable location tracking first.");
-                }
+                const selectedStopLocation = JSON.parse(stopsDropdown.value);
+                const stopLatLng = { lat: selectedStopLocation.lat, lng: selectedStopLocation.lng };
+                const stopName = stopsDropdown.options[stopsDropdown.selectedIndex].text;
+
+                if (destinationMarker) destinationMarker.setMap(null);
+                destinationMarker = new google.maps.Marker({ position: stopLatLng, map: map });
+                
+                drawRoute(userMarker.getPosition().toJSON(), stopLatLng, stopName);
             });
         }
-        
-        initApp();
     </script>
+    
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA5wNRRJqibs9qG7nX6Xgt2z38-UcNr-wI&callback=initMap&libraries=geometry,places"></script>
 </body>
 </html>

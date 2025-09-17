@@ -1,82 +1,120 @@
 import os
 import json
-import requests # Make sure you have 'requests' installed (pip install requests)
+import googlemaps
+from datetime import datetime
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO
+from dotenv import load_dotenv
 
+load_dotenv()
+
+# --- App Initialization ---
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key!'
+app.config['SECRET_KEY'] = 'f9bf78b9a18ce6d46a0cd2b0b86df9da' # Use a randomly generated key
 socketio = SocketIO(app)
 
-# --- Load API Key ---
-ORS_API_KEY = os.environ.get('ORS_API_KEY')
+# --- Initialize Google Maps Client ---
+API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY')
+if not API_KEY:
+    raise RuntimeError("GOOGLE_MAPS_API_KEY environment variable not set.")
+gmaps = googlemaps.Client(key=API_KEY)
 
-# --- (The rest of your setup remains the same) ---
-bus_routes_data = []
-try:
-    with open('bus_data.json', 'r', encoding='utf-8') as f:
-        bus_routes_data = json.load(f)
-except FileNotFoundError:
-    print("WARNING: bus_data.json not found.")
-translations = {'en': {"header_title": "LiveTrack"}}
+# --- In-Memory Data Storage ---
 tracker_locations = {}
 
-# --- NEW ROUTE to calculate a road path using OpenRouteService ---
-@app.route('/get_route', methods=['GET'])
-def get_route():
-    if not ORS_API_KEY:
-        return jsonify({"error": "ORS API key not configured on server"}), 500
+# --- API Endpoints using Google Maps ---
+
+@app.route('/search_destination')
+def search_destination():
+    """Finds a destination and its nearby bus stops using Google Maps APIs."""
+    query = request.args.get('query')
+    user_lat = request.args.get('lat')
+    user_lng = request.args.get('lng')
+
+    if not query:
+        return jsonify({"error": "Query is missing"}), 400
+
+    try:
+        geocode_result = gmaps.geocode(query, region='in')
+        if not geocode_result:
+            return jsonify({"error": "Location not found"}), 404
+        dest_location = geocode_result[0]['geometry']['location']
         
-    start_coords = request.args.get('start') # "lng,lat"
-    end_coords = request.args.get('end')     # "lng,lat"
+        nearby_stops = []
+        if user_lat and user_lng:
+            places_result = gmaps.places_nearby(
+                location=(user_lat, user_lng),
+                rank_by='distance',
+                type='bus_station'
+            )
+            for place in places_result.get('results', [])[:4]:
+                nearby_stops.append({
+                    "name": place.get('name'),
+                    "location": place['geometry']['location']
+                })
 
-    if not start_coords or not end_coords:
-        return jsonify({"error": "Start or end coordinates missing"}), 400
-    
-    headers = {
-        'Authorization': ORS_API_KEY,
-        'Content-Type': 'application/json'
-    }
-    # Note: ORS expects coordinates in (longitude, latitude) format
-    body = {
-        "coordinates": [
-            [float(coord) for coord in start_coords.split(',')],
-            [float(coord) for coord in end_coords.split(',')]
-        ]
-    }
-    
-    # We'll use the foot-walking profile for the route
-    response = requests.post(
-        'https://api.openrouteservice.org/v2/directions/foot-walking/json', 
-        json=body, 
-        headers=headers
-    )
-    
-    if response.status_code == 200:
-        return jsonify(response.json())
-    else:
-        return jsonify({"error": "Failed to get route from ORS", "details": response.text}), response.status_code
+        response_data = {
+            "destination": {
+                "name": geocode_result[0]['formatted_address'],
+                "location": dest_location
+            },
+            "nearby_stops": nearby_stops
+        }
+        return jsonify(response_data)
 
-# --- (All other routes remain the same) ---
-@app.route('/get_routes')
-def get_routes(): return jsonify(bus_routes_data)
-# ... (and so on for all your existing routes)
-@app.route('/')
-def welcome(): return render_template('welcome.html')
-@app.route('/tracker/<lang>')
-def index(lang):
-    selected_translations = translations.get(lang, translations['en'])
-    return render_template('index.html', translations=selected_translations)
-@app.route('/mobile')
-def mobile_tracker(): return render_template('mobile_tracker.html')
+    except Exception as e:
+        print(f"Google Maps API Error: {e}")
+        return jsonify({"error": "An error occurred with the mapping service"}), 500
+
+@app.route('/get_route')
+def get_route():
+    """Calculates a route using the Google Maps Directions API."""
+    start_coords = tuple(map(float, request.args.get('start').split(',')))
+    end_coords = tuple(map(float, request.args.get('end').split(',')))
+
+    try:
+        directions_result = gmaps.directions(start_coords, end_coords, mode="walking", departure_time=datetime.now())
+        if not directions_result:
+            return jsonify({"error": "Could not calculate a route"}), 404
+
+        route = directions_result[0]
+        overview_polyline = route['overview_polyline']['points']
+        duration_text = route['legs'][0]['duration']['text']
+        
+        return jsonify({ "polyline": overview_polyline, "duration": duration_text })
+
+    except Exception as e:
+        print(f"Google Directions API Error: {e}")
+        return jsonify({"error": "An error occurred with the routing service"}), 500
+
+# --- Live Tracker Endpoint ---
 @app.route('/update_location', methods=['POST'])
 def update_location():
-    data = request.get_json(); device_id = data['device_id']; location = {'lat': data['lat'], 'lng': data['lng']}
-    tracker_locations[device_id] = location; socketio.emit('new_location', {'device_id': device_id, 'location': location})
-    print(f"Received update from: {device_id} at {location}"); return jsonify({"status": "success"})
+    data = request.get_json()
+    device_id = data['device_id']
+    location = {'lat': data['lat'], 'lng': data['lng']}
+    tracker_locations[device_id] = location
+    socketio.emit('new_location', {'device_id': device_id, 'location': location})
+    print(f"Received update from: {device_id}")
+    return jsonify({"status": "success"})
+
+# --- Page Serving Routes ---
+@app.route('/')
+def welcome(): return render_template('welcome.html')
+
+@app.route('/tracker/<lang>')
+def index(lang):
+    return render_template('index.html')
+
+@app.route('/mobile')
+def mobile_tracker(): return render_template('mobile_tracker.html')
+
+# --- Socket.IO Events ---
 @socketio.on('connect')
 def handle_connect():
     for device_id, location in tracker_locations.items():
         socketio.emit('new_location', {'device_id': device_id, 'location': location})
+
+# --- Run the App ---
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)
