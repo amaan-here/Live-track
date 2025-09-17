@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Udaipur Bus Tracker</title>
+    <title>Bus Karo</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     
@@ -30,7 +30,7 @@
 
     <div id="search-container">
         <div class="search-box">
-            <input type="text" id="search-input" placeholder="Search Destination...">
+            <input type="text" id="search-input" placeholder="Search a Destination...">
             <button id="search-btn">🔍</button>
         </div>
     </div>
@@ -47,7 +47,6 @@
         let userMarker = null, destinationMarker = null, routePolyline = null;
         let infoWindow;
 
-        // UI Elements
         const searchInput = document.getElementById('search-input');
         const searchBtn = document.getElementById('search-btn');
         const stopsDropdownContainer = document.getElementById('stops-dropdown-container');
@@ -55,8 +54,8 @@
 
         function initMap() {
             map = new google.maps.Map(document.getElementById("map"), {
-                center: { lat: 24.5854, lng: 73.7125 },
-                zoom: 14,
+                center: { lat: 26.9124, lng: 75.7873 }, // Default to Jaipur, can be changed
+                zoom: 13,
                 mapTypeControl: false,
                 streetViewControl: false
             });
@@ -85,7 +84,7 @@
                     position: latLng,
                     map: map,
                     title: `Live Bus: ${deviceId}`,
-                    icon: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#1a202c"><path d="M0 0h24v24H0z" fill="none"/><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2V9c0-.55-.45-1-1-1zm-6 10H6c-.55 0-1-.45-1-1V6h11v12zM7 15c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm10 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>')
+                    icon: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0V0z" fill="none"/><path fill="#2d3748" d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2V9c0-.55-.45-1-1-1zm-6 10H6c-.55 0-1-.45-1-1s.45-1 1-1h8c.55 0 1 .45 1 1s-.45 1-1 1zm-4-3H6V6h9v9H9v-2zm10-2H9V6h2v5h7v2z"/></svg>')
                 });
             }
         }
@@ -101,7 +100,7 @@
                         title: "Your Location",
                         icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: '#3182ce', fillOpacity: 1, strokeWeight: 2, strokeColor: '#ffffff' }
                     });
-                    map.panTo(latLng);
+                    map.setCenter(latLng);
                 } else {
                     userMarker.setPosition(latLng);
                 }
@@ -110,9 +109,9 @@
 
         async function handleSearch() {
             const query = searchInput.value.trim();
-            if (!query || !userMarker) {
-                return alert("Please enter a destination and enable your location.");
-            }
+            if (!query) return;
+            if (!userMarker) return alert("Your location is needed to find nearby stops. Please enable location services.");
+            
             const userLatLng = userMarker.getPosition().toJSON();
 
             try {
@@ -162,8 +161,8 @@
                     path: routePath,
                     geodesic: true,
                     strokeColor: '#3182ce',
-                    strokeOpacity: 0.8,
-                    strokeWeight: 5
+                    strokeOpacity: 0.9,
+                    strokeWeight: 6
                 });
                 routePolyline.setMap(map);
                 
@@ -172,7 +171,7 @@
                 map.fitBounds(bounds);
 
                 infoWindow.setContent(`<b>${stopName}</b><br>~ ${data.duration} walk`);
-                infoWindow.open(map, destinationMarker);
+                infoWindow.open({ anchor: destinationMarker, map });
                 
             } catch (error) {
                 console.error("Routing Error:", error);

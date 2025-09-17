@@ -3,24 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to LiveTrack</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <title>Welcome to Bus Karo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body{display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background-color:#1a202c;color:#e2e8f0;font-family:'Poppins',sans-serif;text-align:center}.container{padding:40px;background-color:#2d3748;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.3)}.language-buttons{display:flex;flex-wrap:wrap;justify-content:center;gap:15px}h1{font-size:2rem;margin-bottom:10px}p{font-size:1rem;color:#a0aec0;margin-bottom:30px}.language-buttons a{display:inline-block;text-decoration:none;color:#e2e8f0;background-color:#4a5568;padding:12px 25px;border-radius:8px;font-weight:600;transition:background-color .3s ease,transform .2s ease}.language-buttons a:hover{background-color:#3182ce;transform:translateY(-3px)}
+        body {
+            margin: 0;
+            background-color: #1a202c;
+            font-family: 'Poppins', sans-serif;
+            overflow: hidden; /* Prevents scrollbars during animation */
+        }
+
+        /* --- Splash Screen Styling --- */
+        #splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #1a202c;
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* Apply the fade-out animation */
+            animation: splashFadeOut 3.5s ease-in-out forwards;
+        }
+
+        .logo {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            /* Apply the fade-in animation for the logo text */
+            animation: logoFadeIn 2.5s ease-in-out;
+        }
+
+        /* --- Language Selection Container Styling --- */
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+            text-align: center;
+            /* Start hidden and apply fade-in animation after a delay */
+            opacity: 0;
+            animation: fadeInContent 1s ease-in-out 3s forwards;
+        }
+        
+        .container h1 { font-size: 2rem; color: #e2e8f0; margin-bottom: 10px; }
+        .container p { font-size: 1rem; color: #a0aec0; margin-bottom: 30px; }
+        .language-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; }
+        .language-buttons a { display: inline-block; text-decoration: none; color: #e2e8f0; background-color: #4a5568; padding: 12px 25px; border-radius: 8px; font-weight: 600; transition: background-color .3s ease, transform .2s ease; }
+        .language-buttons a:hover { background-color: #3182ce; transform: translateY(-3px); }
+
+        /* --- CSS Keyframe Animations --- */
+
+        /* Animation for the logo text to fade in */
+        @keyframes logoFadeIn {
+            0% { opacity: 0; transform: scale(0.9); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        
+        /* Animation for the entire splash screen to fade out */
+        @keyframes splashFadeOut {
+            0% { opacity: 1; }
+            80% { opacity: 1; } /* Hold the screen for a bit */
+            100% { opacity: 0; }
+        }
+
+        /* Animation for the main content to fade in after the splash screen is gone */
+        @keyframes fadeInContent {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
+    <div id="splash-screen">
+        <div class="logo">Bus Karo 🚌</div>
+    </div>
+
     <div class="container">
-        <h1>Welcome to LiveTrack 🛰️</h1>
+        <h1>Welcome to Bus Karo</h1>
         <p>Please select your language to continue</p>
         <div class="language-buttons">
             <a href="/tracker/en">English</a>
             <a href="/tracker/hi">हिन्दी</a>
             <a href="/tracker/mwr">मेवाड़ी / मारवाड़ी</a>
-            <a href="/tracker/mr">मराठी</a>
-            <a href="/tracker/gu">ગુજરાતી</a>
-            <a href="/tracker/bn">বাংলা</a>
             </div>
     </div>
+
+    <script>
+        // This small script will hide the splash screen after the animation is done
+        // to ensure it doesn't block clicks on the language buttons.
+        const splashScreen = document.getElementById('splash-screen');
+        setTimeout(() => {
+            splashScreen.style.display = 'none';
+        }, 3500); // 3500ms = 3.5s, matching the CSS animation duration
+    </script>
 </body>
 </html>
