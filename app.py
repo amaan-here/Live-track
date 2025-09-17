@@ -91,7 +91,6 @@ def get_route():
         print(f"Google Directions API Error: {e}")
         return jsonify({"error": "An error occurred with the routing service"}), 500
 
-
 # --- Live Tracker Endpoint ---
 @app.route('/update_location', methods=['POST'])
 def update_location():
@@ -100,7 +99,7 @@ def update_location():
     location = {'lat': data['lat'], 'lng': data['lng']}
     tracker_locations[device_id] = location
     socketio.emit('new_location', {'device_id': device_id, 'location': location})
-    print(f"Received update from: {device_id}")
+    print(f"Received update from: {device_id} at {location}")
     return jsonify({"status": "success"})
 
 # --- Page Serving Routes ---
@@ -121,4 +120,4 @@ def handle_connect():
 
 # --- Run the App ---
 if __name__ == '__main__':
-    socketio.run(app, host='`0.0.0.0`', port=5000, debug=True)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
