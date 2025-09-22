@@ -11,7 +11,7 @@ load_dotenv()
 
 # --- App Initialization ---
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'a-random-secret-key-you-generate'
+app.config['SECRET_KEY'] = 'b0a82e57c98e62914d33ed65c565ea83'
 socketio = SocketIO(app)
 
 # --- Initialize Google Maps Client ---

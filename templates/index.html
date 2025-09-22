@@ -12,7 +12,7 @@
     <style>
         :root{--surface-color:#ffffff; --text-color:#1a202c; --accent-color:#3182ce; --shadow-color: rgba(0,0,0,0.1);}
         html, body { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Poppins', sans-serif; background-color: #f0f2f5; }
-        #map-container { position: absolute; top: 20px; right: 20px; bottom: 20px; left: 20px; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px var(--shadow-color); }
+        #map-container { position: absolute; top: 0px; right: 0px; bottom: 0px; left: 0px; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px var(--shadow-color); }
         #map { width: 100%; height: 100%; background-color: #e0e0e0; }
         #search-container { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; z-index: 10; }
         .search-box { display: flex; box-shadow: 0 5px 15px var(--shadow-color); }
@@ -20,7 +20,7 @@
         #search-btn { padding: 0 20px; font-size: 1.2rem; border: 1px solid #ddd; border-left: none; background-color: var(--accent-color); color: white; cursor: pointer; border-radius: 0 12px 12px 0; }
         #stops-dropdown-container { position: absolute; top: 110px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; z-index: 9; }
         #stops-dropdown { width: 100%; padding: 15px; font-size: 1rem; border-radius: 12px; border: 1px solid #ddd; background-color: var(--surface-color); color: var(--text-color); box-shadow: 0 5px 15px var(--shadow-color); }
-        #recenter-btn { position: absolute; bottom: 30px; right: 20px; z-index: 10; background-color: var(--surface-color); border: 1px solid #ddd; border-radius: 50%; width: 44px; height: 44px; cursor: pointer; box-shadow: 0 2px 8px var(--shadow-color); display: flex; align-items: center; justify-content: center; }
+        #recenter-btn { position: absolute; bottom: 40px; right: 60px; z-index: 10; background-color: var(--surface-color); border: 1px solid #ddd; border-radius: 50%; width: 44px; height: 44px; cursor: pointer; box-shadow: 0 2px 8px var(--shadow-color); display: flex; align-items: center; justify-content: center; }
         #recenter-btn svg { width: 24px; height: 24px; }
     </style>
 </head>
@@ -37,7 +37,7 @@
 
     <div id="search-container">
         <div class="search-box">
-            <input type="text" id="search-input" placeholder="Search Destination or Bus ID...">
+            <input type="text" id="search-input" placeholder="Enter destination or track bus">
             <button id="search-btn">🔍</button>
         </div>
     </div>
@@ -64,7 +64,7 @@
         function initMap() {
             map = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: 24.5854, lng: 73.7125 }, // Udaipur
-                zoom: 13,
+                zoom: 14,
                 mapTypeControl: false,
                 streetViewControl: false,
                 fullscreenControl: false,
@@ -220,7 +220,7 @@
             recenterBtn.addEventListener('click', () => {
                 if (userMarker) {
                     map.panTo(userMarker.getPosition());
-                    map.setZoom(15);
+                    map.setZoom(17);
                 } else {
                     alert("Your location is not being tracked yet. Please enable location services first.");
                 }
